@@ -1,0 +1,188 @@
+# JobFinder (Vahan Platform) - Machine-Readable Configuration
+# Auto-generated from codebase analysis
+
+project:
+  name: JobFinder
+  description: Vahan gig/blue-collar workforce hiring and onboarding platform
+  language: javascript
+  runtime: node
+  runtime_version: ">=22.0.0"
+  framework: express
+  orm: sequelize
+  migration_tool: knex
+
+# ─── Lint ────────────────────────────────────────────────────────────────────
+# CHANGED FILES ONLY: Repo has pre-existing lint violations. Running lint on
+# the whole repo would flag thousands of issues. We lint ONLY the files the
+# agent changed — keeping new code clean without touching legacy code.
+
+lint:
+  command: "npx eslint {changed_files}"
+  autofix: "npx eslint --fix {changed_files}"
+  scope: changed_files_only
+
+# ─── Format ──────────────────────────────────────────────────────────────────
+
+format:
+  check: "npx prettier --check {changed_files}"
+  fix: "npx prettier --write {changed_files}"
+  scope: changed_files_only
+    tabWidth: 4
+    trailingComma: none
+    printWidth: 120
+    arrowParens: avoid
+  ignore_file: .prettierignore
+  ignored_paths:
+    - node_modules
+    - _migrations/
+    - migrations/
+    - JobFinderAdmin/
+    - webhooks/
+
+# ─── Test ────────────────────────────────────────────────────────────────────
+
+test:
+  framework: mocha
+  command: npm test
+  raw_command: "NODE_ENV=testing _mocha --reporter dot --exit --no-timeout"
+  unit_tests_command: npm run unit-tests
+  unit_tests_raw: "cd test && ./run.sh && cd .."
+  coverage_command: npm run coverage
+  coverage_raw: "nyc --reporter html --reporter text npm test"
+  redis_test_command: npm run test:redis
+  redis_test_raw: "NODE_ENV=development mocha test/redis-functions.test.js --timeout 10000"
+  test_directory: test/
+  bootstrap_file: test/bootstrap.js
+  mocha_opts: test/mocha.opts
+  fixture_file: test/fixture/mesl_test.sql
+  assertion_library: chai
+  http_testing: chai-http
+  mocking: sinon
+  module_stubbing: proxyquire
+  http_supertest: supertest
+
+# ─── Test Mapping ────────────────────────────────────────────────────────────
+
+test_mapping:
+  rules:
+    - description: "Library modules"
+      source_pattern: "lib/*.js"
+      test_pattern: "test/lib/*.js"
+      example:
+        source: lib/chat.js
+        test: test/lib/chat.js
+    - description: "Cron jobs"
+      source_pattern: "jobs/*.js"
+      test_pattern: "test/jobs/*.js"
+      example:
+        source: jobs/sendJobAlerts.js
+        test: test/jobs/sendJobAlerts.js
+    - description: "State transition logic"
+      source_pattern: "lib/stateTransition.js"
+      test_pattern: "test/states/*.js"
+      note: "Multiple state-specific test files"
+    - description: "Reminder logic"
+      source_pattern: "lib/reminders.js"
+      test_pattern: "test/reminder/*.js"
+    - description: "Redis functions"
+      source_pattern: "lib/redis*.js"
+      test_pattern: "test/redis-functions.test.js"
+    - description: "Form IO"
+      source_pattern: "lib/workflowManagement/**/*.js"
+      test_pattern: "test/lib/formIo.test.js"
+  notes:
+    - "vahan_leader/ modules do NOT have corresponding tests"
+    - "hotline/ modules do NOT have corresponding tests"
+    - "Top-level *Consumer.js files do NOT have corresponding tests"
+    - "Test coverage is sparse relative to codebase size"
+
+# ─── Migration ───────────────────────────────────────────────────────────────
+
+migration:
+  primary:
+    command: npm run migrate:up
+    directory: migrations/
+    table_name: knex_migrations
+    config_file: knexfile.js
+    dialect: pg
+    count: 1027
+  annotation:
+    up_command: npm run db-migrate-up
+    down_command: npm run db-migrate-down
+    directory: annotation-migrations/
+    config_file: config/db-migrate.json
+    tool: db-migrate
+  legacy:
+    directory: _migrations/
+    note: "Legacy db-migrate migration files"
+
+# ─── Sandbox Services ───────────────────────────────────────────────────────
+
+sandbox:
+  services:
+    postgresql:
+      host: localhost
+      port: 5432
+      database: mesl_test
+      username: mesl
+      dialect: postgres
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+    rabbitmq:
+      host: localhost
+      port: 5672
+      username: guest
+      password: guest
+
+  env_vars:
+    NODE_ENV: testing
+    # Database connection is read from config/database.json[NODE_ENV]
+    # Redis connection is read from config/redis.json[NODE_ENV]
+    # RabbitMQ connection is read from config/rabbitMqConfig.json[NODE_ENV]
+
+  setup_steps:
+    - description: "Install dependencies"
+      command: npm install
+    - description: "Restore test database"
+      command: "psql -U mesl -d mesl_test -h localhost -p 5432 -f test/fixture/mesl_test.sql"
+    - description: "Run migrations"
+      command: npm run migrate:up
+    - description: "Run tests"
+      command: npm test
+
+# ─── Entry Points ───────────────────────────────────────────────────────────
+
+entry_points:
+  main_api: mitraAPI.js
+  legacy_api: api.js
+  admin: admin.js
+  jobseeker_engagement: jobseeker-engagement.js
+  payment_server: paymentServer.js
+  rpc_server: rpcServer.js
+  predictive_dialer: hotline-predictive-dialer.js
+
+# ─── Key Directories ────────────────────────────────────────────────────────
+
+directories:
+  models: _models/
+  models_count: 376
+  migrations: migrations/
+  migrations_count: 1027
+  config: config/
+  lib: lib/
+  feature_modules: vahan_leader/
+  hotline_modules: hotline/
+  admin_routes: routes/admin/
+  cron_jobs: jobs/
+  consumers: "top-level *Consumer.js files"
+  middlewares: middlewares/
+  views: views/
+  webhooks: webhooks/
+  domain_enums: domain/
+  error_classes: errors/
+  utilities: utils/
+  scripts: scripts/
+  standalone_processes: standaloneProcess/
+  mongo_models: mongoModels/

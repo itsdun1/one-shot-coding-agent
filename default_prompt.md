@@ -1,19 +1,19 @@
-# Default Prompt — Organization Conventions
+# Default Prompt — Vahan Engineering
 
 ## Default Organization
 
-When no repository is specified, assume the organization is `my-org`.
+When no repository is specified, assume the organization is `VahanInc`.
 
 ## Repository Routing
 
 Common repos and their shorthand:
-- `backend` → `my-org/backend`
-- `frontend` → `my-org/frontend`
+- `jobfinder` or `jf` → `VahanInc/JobFinder`
+- `mitra-leader` or `pwa` → `VahanInc/mitra-leader-pwa`
 
 ## Organization Conventions
 
 - Use conventional commits: `fix:`, `feat:`, `chore:`, `refactor:`
-- Always reference the ticket in commit messages when provided
+- Always reference the Jira ticket in commit messages when provided (e.g., `fix: resolve OTP timeout [VAN-1234]`)
 - Tag the requesting user when work is complete
 - Never hardcode secrets, credentials, or environment-specific URLs
 - Production database changes require a migration file — no direct schema edits
@@ -28,5 +28,5 @@ Common repos and their shorthand:
 ## Security
 
 - Never write raw SQL queries without parameterization
-- If an existing pattern is vulnerable, do not follow it — apply best practice instead
+- If an existing pattern is vulnerable (SQL injection, eval, hardcoded secrets), do not follow it — apply best practice instead
 - Do not commit files that contain secrets (.env, credentials.json, etc.)
