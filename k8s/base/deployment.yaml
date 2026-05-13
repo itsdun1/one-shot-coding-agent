@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vahan-agent
+  namespace: vahan-agent
+  labels:
+    app: vahan-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vahan-agent
+  template:
+    metadata:
+      labels:
+        app: vahan-agent
+    spec:
+      containers:
+        - name: agent
+          image: 091997204841.dkr.ecr.ap-south-1.amazonaws.com/vahan-agent/orchestrator:latest
+          ports:
+            - name: webhooks
+              containerPort: 8000
+            - name: langgraph
+              containerPort: 2024
+          envFrom:
+            - secretRef:
+                name: vahan-agent-secrets
+          env:
+            - name: DEFAULT_REPO_OWNER
+              value: "VahanInc"
+            - name: DEFAULT_REPO_NAME
+              value: "JobFinder"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
