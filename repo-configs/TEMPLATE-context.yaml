@@ -1,0 +1,131 @@
+# {Project Name} - Machine-Readable Configuration
+# Fill in values by reading the actual codebase. Do NOT guess.
+
+project:
+  name: "{project-name}"
+  description: "{one-line description}"
+  language: "{primary language: javascript, typescript, python, go, etc.}"
+  runtime: "{runtime: node, python, go, java, etc.}"
+  runtime_version: "{version constraint from package.json engines or similar}"
+  framework: "{web framework: express, fastify, django, flask, gin, etc.}"
+  orm: "{ORM if applicable: sequelize, prisma, sqlalchemy, gorm, etc.}"
+  migration_tool: "{migration tool: knex, prisma, alembic, goose, etc.}"
+
+# ─── Lint ────────────────────────────────────────────────────────────────────
+
+lint:
+  command: "{npm run lint | make lint | etc.}"
+  raw_command: "{the actual command that runs: eslint . | flake8 | etc.}"
+  config_file: "{.eslintrc.js | pyproject.toml | .golangci.yml | etc.}"
+  extends:
+    - "{base config 1}"
+    - "{base config 2}"
+  ignore_file: "{.eslintignore | etc.}"
+  ignored_paths:
+    - node_modules
+    # Add other ignored paths
+  fix_command: "{auto-fix command if available}"
+  pre_commit_hook: "{describe pre-commit lint hook if any}"
+
+# ─── Format ──────────────────────────────────────────────────────────────────
+
+format:
+  command: "{npm run format | make format | etc.}"
+  raw_command: "{prettier --write ... | black . | gofmt | etc.}"
+  check_command: "{format check command if available}"
+  config_file: "{.prettierrc | pyproject.toml | etc.}"
+  settings:
+    # List key formatting settings
+    # semi: true
+    # tabWidth: 4
+    # etc.
+  ignore_file: "{.prettierignore | etc.}"
+  ignored_paths: []
+
+# ─── Test ────────────────────────────────────────────────────────────────────
+
+test:
+  framework: "{mocha | jest | pytest | go test | etc.}"
+  command: "{npm test | make test | etc.}"
+  raw_command: "{the actual command that runs}"
+  coverage_command: "{coverage command if available}"
+  coverage_raw: "{the actual coverage command}"
+  test_directory: "{test/ | tests/ | __tests__/ | etc.}"
+  bootstrap_file: "{test setup/bootstrap file if any}"
+  fixture_file: "{test fixture/seed file if any}"
+  assertion_library: "{chai | jest built-in | assert | etc.}"
+  mocking: "{sinon | jest built-in | unittest.mock | etc.}"
+
+# ─── Test Mapping ────────────────────────────────────────────────────────────
+# Describe how test files map to source files so agents know where to find
+# or create tests for a given source file.
+
+test_mapping:
+  rules:
+    - description: "{human description of mapping rule}"
+      source_pattern: "{glob pattern for source files}"
+      test_pattern: "{glob pattern for test files}"
+      example:
+        source: "{example source path}"
+        test: "{example test path}"
+    # Add more rules as needed
+  notes:
+    - "{Note any areas without test coverage}"
+    - "{Note any unconventional test locations}"
+
+# ─── Migration ───────────────────────────────────────────────────────────────
+
+migration:
+  primary:
+    command: "{migration up command}"
+    directory: "{migrations directory}"
+    config_file: "{migration config file}"
+    dialect: "{pg | mysql | sqlite | etc.}"
+  # Add additional migration sets if the project has multiple
+
+# ─── Sandbox Services ───────────────────────────────────────────────────────
+# Services required to run the application locally or in a sandbox/CI.
+
+sandbox:
+  services:
+    # List each service with connection details for local development
+    # postgresql:
+    #   host: localhost
+    #   port: 5432
+    #   database: "{db_name}"
+    #   username: "{user}"
+    # redis:
+    #   host: localhost
+    #   port: 6379
+    # rabbitmq:
+    #   host: localhost
+    #   port: 5672
+
+  env_vars:
+    # List environment variables needed for test/sandbox
+    # NODE_ENV: testing
+    # DATABASE_URL: "..."
+
+  setup_steps:
+    - description: "Install dependencies"
+      command: "{npm install | pip install -r requirements.txt | go mod download | etc.}"
+    - description: "Setup database"
+      command: "{migration or seed command}"
+    - description: "Run tests"
+      command: "{test command}"
+
+# ─── Entry Points ───────────────────────────────────────────────────────────
+
+entry_points:
+  # List application entry points
+  # main: "{filename}"
+  # worker: "{filename}"
+
+# ─── Key Directories ────────────────────────────────────────────────────────
+
+directories:
+  # List key directories and their role
+  # models: "{path}"
+  # migrations: "{path}"
+  # routes: "{path}"
+  # etc.
