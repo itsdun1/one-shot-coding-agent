@@ -39,8 +39,7 @@ from .middleware import (
     ensure_no_empty_msg,
     notify_step_limit_reached,
 )
-from .middleware.prefilter_context import prefilter_context
-from .middleware.deterministic_checks import deterministic_checks
+from .middleware.vahan_middleware import PreFilterMiddleware, DeterministicChecksMiddleware
 from .prompt import construct_system_prompt
 from .tools import (
     fetch_url,
@@ -370,7 +369,7 @@ async def get_agent(config: RunnableConfig) -> Pregel:
 
     model_id = os.environ.get("LLM_MODEL_ID", DEFAULT_LLM_MODEL_ID)
     model_kwargs: ModelKwargs = {"max_tokens": DEFAULT_LLM_MAX_TOKENS}
-    if model_id == DEFAULT_LLM_MODEL_ID:
+    if model_id.startswith("openai:"):
         model_kwargs["reasoning"] = DEFAULT_LLM_REASONING
 
     fallback_model_id = os.environ.get("LLM_FALLBACK_MODEL_ID") or fallback_model_id_for(model_id)
@@ -384,14 +383,33 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         )
         logger.info("Configured model fallback %s -> %s", model_id, fallback_model_id)
 
+    # --- Langfuse tracing ---
+    langfuse_handler = None
+    try:
+        from langfuse.langchain import CallbackHandler as LangfuseHandler
+        if os.environ.get("LANGFUSE_PUBLIC_KEY"):
+            # For self-hosted: OTEL endpoint is /api/public/otel
+            base_url = os.environ.get("LANGFUSE_HOST", "http://langfuse:3000")
+            os.environ["LANGFUSE_BASE_URL"] = base_url
+            os.environ.setdefault(
+                "OTEL_EXPORTER_OTLP_ENDPOINT",
+                f"{base_url}/api/public/otel",
+            )
+            os.environ.setdefault("OTEL_EXPORTER_OTLP_TIMEOUT", "10000")
+            langfuse_handler = LangfuseHandler()
+            logger.info("Langfuse tracing enabled for thread %s (base_url=%s)", thread_id, base_url)
+    except Exception as e:
+        logger.warning("Langfuse not available: %s", e)
+
     logger.info("Returning agent with sandbox for thread %s", thread_id)
-    return create_deep_agent(
-        model=make_model(model_id, **model_kwargs),
+    agent = create_deep_agent(
+        model=model_id,
         system_prompt=construct_system_prompt(
             working_dir=work_dir,
             linear_project_id=linear_project_id,
             linear_issue_number=linear_issue_number,
             triggering_user_identity=triggering_user_identity,
+            thread_id=thread_id or "",
         ),
         tools=[
             http_request,
@@ -412,14 +430,17 @@ async def get_agent(config: RunnableConfig) -> Pregel:
         middleware=[
             SanitizeToolInputsMiddleware(),
             ModelCallLimitMiddleware(run_limit=MODEL_CALL_RECURSION_LIMIT, exit_behavior="end"),
-            prefilter_context,  # Vahan: additive pre-filter (keyword→rg→rank→inject)
+            PreFilterMiddleware(),
             ToolErrorMiddleware(),
             check_message_queue_before_model,
             SlackAssistantStatusMiddleware(),
             ensure_no_empty_msg,
             notify_step_limit_reached,
-            deterministic_checks,  # Vahan: lint (changed files) + test + retry after agent
+            DeterministicChecksMiddleware(),
             SandboxCircuitBreakerMiddleware(),
             *fallback_middleware,
         ],
-    ).with_config(config)
+    )
+    if langfuse_handler:
+        config["callbacks"] = (config.get("callbacks") or []) + [langfuse_handler]
+    return agent.with_config(config)

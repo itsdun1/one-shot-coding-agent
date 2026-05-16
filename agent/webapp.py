@@ -856,6 +856,31 @@ async def process_slack_mention(event_data: dict[str, Any], repo_config: dict[st
                 )
 
     thread_messages = await fetch_slack_thread_messages(channel_id, thread_ts)
+
+    # --- Haiku validation gate: only on FIRST message in thread ---
+    # Skip validation for follow-up messages (user giving suggestions/corrections mid-task)
+    bot_has_replied = any(
+        msg.get("user") == bot_user_id or msg.get("bot_id")
+        for msg in thread_messages
+        if str(msg.get("ts")) != str(event_ts)  # exclude current message
+    )
+    if not bot_has_replied:
+        try:
+            from agent.utils.task_validator import validate_task
+            is_valid, reason = await validate_task(text)
+            if not is_valid:
+                await post_slack_thread_reply(
+                    channel_id, thread_ts,
+                    f"I need a clearer task before I can help. {reason}\n\n"
+                    "Please specify:\n"
+                    "• Which file(s) to change (e.g. `orgPermissions.service.js`)\n"
+                    "• What to do (e.g. replace, add, remove, fix)\n\n"
+                    "Example: _Replace console.log with logger in orgPermissions.service.js_"
+                )
+                logger.info("Task rejected by Haiku validation: %s", reason)
+                return
+        except Exception as e:
+            logger.debug("Haiku validation skipped: %s", e)
     if not any(str(message.get("ts")) == str(event_ts) for message in thread_messages):
         thread_messages.append({"ts": event_ts, "text": text, "user": user_id})
 

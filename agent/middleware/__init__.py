@@ -7,7 +7,7 @@ from .refresh_slack_status import SlackAssistantStatusMiddleware
 from .sandbox_circuit_breaker import SandboxCircuitBreakerMiddleware
 from .sanitize_tool_inputs import SanitizeToolInputsMiddleware
 from .tool_error_handler import ToolErrorMiddleware
-from .prefilter_context import prefilter_context
+from .prefilter_context import before_model as prefilter_context
 from .deterministic_checks import deterministic_checks
 
 __all__ = [

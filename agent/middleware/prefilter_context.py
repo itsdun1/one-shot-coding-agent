@@ -34,9 +34,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # External helpers -- assumed to exist elsewhere in the codebase.
 # ---------------------------------------------------------------------------
-from agent.sandbox_registry import get_sandbox_backend  # type: ignore[import-untyped]
-from agent.sandbox_registry import resolve_repo_path    # type: ignore[import-untyped]
-from agent.message_utils import count_human_messages     # type: ignore[import-untyped]
+from agent.utils.sandbox_state import get_sandbox_backend_sync as get_sandbox_backend
+from agent.utils.sandbox_paths import resolve_sandbox_work_dir as resolve_repo_path
+
+
+def count_human_messages(messages: list) -> int:
+    """Count the number of human/user messages in the conversation."""
+    return sum(1 for m in messages if getattr(m, "type", None) == "human")
 
 # ---------------------------------------------------------------------------
 # Tunables

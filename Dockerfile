@@ -85,3 +85,13 @@ RUN echo "=== Installed versions ===" \
     && docker --version \
     && git --version \
     && gh --version
+
+# --- Vahan: install kubectl for Fargate sandbox management ---
+RUN curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    -o /usr/local/bin/kubectl && chmod +x /usr/local/bin/kubectl
+
+# --- Vahan: bake source code + install deps ---
+COPY . /workspace
+RUN /root/.local/bin/uv pip install --system -e . && \
+    /root/.local/bin/uv pip install --system langfuse
+CMD ["langgraph", "dev", "--host", "0.0.0.0", "--port", "2024", "--no-reload", "--no-browser", "--n-jobs-per-worker", "3"]

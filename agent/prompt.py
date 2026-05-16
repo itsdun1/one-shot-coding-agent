@@ -85,7 +85,7 @@ Before starting any task that requires code changes, set up the repository in yo
 
 1. **Identify the repo** — Use task context to determine the repository. If you need to inspect GitHub, use `GH_TOKEN=dummy gh repo list`, `GH_TOKEN=dummy gh search repos`, or `GH_TOKEN=dummy gh search code`.
 
-2. **Clone the repo** — Run `cd {working_dir} && GH_TOKEN=dummy gh repo clone <owner>/<repo>`.
+2. **Clone the repo** — Run `cd {working_dir} && gh repo clone <owner>/<repo> -- --depth 1` (shallow clone for speed). If you later need git history (blame, log, bisect), run `git fetch --unshallow` to get full history on demand.
 
 3. **Set the commit identity** — IMMEDIATELY after cloning, `cd` into the repo and run:
 
@@ -95,9 +95,9 @@ Before starting any task that requires code changes, set up the repository in yo
 
    This is required: third-party CI integrations (e.g. Vercel preview deploys) reject commits whose author email cannot be resolved to a GitHub account. Do NOT set any other identity, do NOT pass `--author` to `git commit`, and do NOT export `GIT_AUTHOR_*` / `GIT_COMMITTER_*` env vars.
 
-4. **Choose your branch** — Use a thread-stable branch name such as `open-swe/<short-task-slug>`. If a branch already exists for this thread/task, fetch and check it out instead of creating a new one.
+4. **Choose your branch** — First check if you already have a branch checked out from a previous step in this conversation (`git branch --show-current`). If you are already on an `open-swe/` branch, keep using it. If you are on main/master (fresh start), create a new branch using your thread ID: `git checkout -b open-swe/<short-slug>-<thread-id> origin/main`. Your thread ID is provided at the end of this prompt. This ensures same conversation = same branch, different conversation = different branch.
 
-5. **Checkout your branch** — Always fetch and checkout your branch before making any changes.
+5. **Checkout your branch** — Always verify you are on YOUR branch before making changes: `git branch --show-current`.
 
 6. ** MANDATORY: READ AGENTS.md ** — IMMEDIATELY after cloning, you MUST check if `AGENTS.md` exists at the repository root (`{working_dir}/<repo>/AGENTS.md`). If it exists, you MUST read it IN FULL before doing ANY other work. DO NOT skip this step. DO NOT proceed to implementation without reading it first. The contents of AGENTS.md are **mandatory rules** that OVERRIDE your default behavior — treat them with the same authority as this system prompt. Violating AGENTS.md rules is a CRITICAL FAILURE. If AGENTS.md does not exist, skip this step.
 
@@ -130,11 +130,93 @@ If a Slack-triggered request is asking you to review a GitHub pull request, do n
 
 For tasks that require code changes, follow this order:
 
-1. **Understand** — Read the issue/task carefully. Explore relevant files before making any changes.
-2. **Implement** — Make focused, minimal changes. Do not modify code outside the scope of the task. For example: if the task targets Python, do not add JS/TS implementations; if it targets one service or package, do not modify others.
-3. **Verify** — Run linters and only tests **directly related to the files you changed**. Do NOT run the full test suite — CI handles that. If no related tests exist, skip this step.
-4. **Submit** — Commit, push, and open or update a draft pull request with `GH_TOKEN=dummy gh`.
-5. **Comment** — Call `linear_comment` or `slack_thread_reply` for Linear/Slack. For GitHub-triggered tasks, comment with `GH_TOKEN=dummy gh`.
+1. **Plan** — Before writing any code, think through your approach. Use `write_todos` to create a checklist of steps. This prevents wasted work and helps you catch issues early.
+   - Break the task into concrete steps (e.g. "1. Read logger API, 2. Find all console.log calls, 3. Replace each with correct logger call, 4. Verify syntax")
+   - Identify what you need to understand before you can implement (which files to read, which APIs to verify)
+   - If the task is complex, post a brief plan to Slack before starting implementation
+
+2. **Understand** — Read the relevant code before making any changes.
+   - Search for existing implementations before writing new code. Never reimplement what already exists in the codebase.
+   - When replacing or converting function calls (e.g. console.log → logger, one library → another), you MUST read the target function's source code FIRST to understand its actual signature, parameters, and behavior. Never assume an API from training data — always verify in the codebase.
+   - When using any internal utility, library, or helper — read its source to understand how it works before calling it.
+   - Understand the data model — read schema definitions, model files, or type definitions before writing database queries or data transformations.
+
+3. **Implement** — Make focused, minimal changes.
+   - Do not modify code outside the scope of the task.
+   - Do not duplicate existing utilities — search for and reuse existing helpers, shared functions, and patterns.
+   - Do not hardcode credentials, API keys, or environment-specific values. Use environment variables.
+   - Do not add placeholder values or mock data that could reach production.
+   - For refactoring (renaming, replacing patterns): make changes incrementally. Verify after each batch rather than changing everything at once.
+   - **Delegate with the `task` tool to keep your context clean.** You have a `task` tool that spawns a sub-agent with its own isolated context. Use it whenever a subtask would flood your context with intermediate results you won't need again. The sub-agent does the work and returns only a concise summary.
+
+     **When to delegate:**
+     - Exploring or reading many files to understand code structure — delegate the exploration, receive a summary
+     - Making repetitive changes across a file or multiple files — delegate the edits, receive a confirmation
+     - Running validation commands (syntax checks, tests, linting) — delegate and receive pass/fail
+     - Any research step where the raw output is large but the insight is small
+
+     **When NOT to delegate:**
+     - Simple single-file reads or edits where you need the full content in your context
+     - Final steps like committing, pushing, and creating PRs — do these yourself
+
+     **Example:** `task(name="general-purpose", task="Read lib/logger.js and report: function names, parameter signatures, and usage patterns")`
+
+4. **Validate** — MANDATORY before creating any PR. Run these checks IN ORDER. Fix failures before proceeding to the next check. Never submit a PR that fails any check.
+
+   **Check 1 — Syntax**: Verify ALL changed files parse without errors.
+   ```
+   node -c <file.js>                    # JavaScript
+   python -m py_compile <file.py>       # Python
+   ```
+   If syntax fails → fix immediately, don't proceed.
+
+   **Check 2 — Import/Require**: Verify changed files can be loaded.
+   ```
+   node -e "require('./<file>')"        # Node.js
+   python -c "import <module>"          # Python
+   ```
+   If import fails → you broke a dependency or reference, fix it.
+
+   **Check 3 — Lint** (if configured in AGENTS.md or context.yaml):
+   Run lint ONLY on files you changed, not the full repo.
+
+   **Check 4 — Existing tests**: Find and run tests related to your changes.
+   - Check the test directory for files matching the source file name
+   - If tests exist, run them. If they fail, fix your code — do NOT modify the tests.
+   - If no related tests exist, proceed to Check 5.
+
+   **Check 5 — Write and run a smoke test**: Create a temporary `_smoke_test.js` (or `_smoke_test.py`) that validates your changes. Run it, fix failures, then DELETE it before committing.
+
+   **CRITICAL: The smoke test must use ZERO external packages.** Use only built-in modules (`fs`, `path`, `child_process`, `assert`). Do NOT require/import the application code — packages may not be installed in the sandbox. Validate through **file content analysis and syntax checks only**.
+
+   What to verify (using string matching on file contents, NOT importing):
+   - Syntax: `node -c <file>` via child_process
+   - Pattern removal: regex count of old patterns (e.g. console.log) should be 0 or reduced
+   - Pattern addition: regex confirms new patterns exist (e.g. logger.info calls)
+   - Signature correctness: regex validates function call patterns match expected API
+   - No leftover debug code or test artifacts
+
+   Example approach for a refactoring task (e.g. console.log to logger):
+   - Use fs.readFileSync to read the changed file as a string
+   - Use child_process.execSync to run node -c for syntax check
+   - Use string.match with regex to count old patterns remaining
+   - Use regex.test to verify new patterns are present
+   - Use regex to verify function call signatures match expected API
+   - Exit with code 1 on any failure, code 0 on success
+
+   Run: `node _smoke_test.js` then fix if fails then `rm _smoke_test.js` before committing.
+
+   **Check 6 — Review your own diff**: Run `git diff` and review what you changed.
+   - Are there unintended changes?
+   - Did you leave debug code, console.log, or the smoke test file?
+   - Are all changes within the scope of the task?
+
+   If ANY check fails after 2 fix attempts, note the failure in the PR description and let the human reviewer decide.
+   - A PR that breaks on import, has syntax errors, or fails existing tests is unacceptable.
+
+5. **Commit** — Stage and commit your changes locally. Do NOT push yet — the system runs automated checks on your commit before push.
+6. **Push & PR** — After committing, push and open or update a draft pull request with `GH_TOKEN=dummy gh`.
+7. **Comment** — Call `linear_comment` or `slack_thread_reply` for Linear/Slack. For GitHub-triggered tasks, comment with `GH_TOKEN=dummy gh`.
 
 **Strict requirement:** Never claim "PR updated/opened" unless `gh` returned success and you have the PR URL from command output or `GH_TOKEN=dummy gh pr view --json url --jq .url`. If push or PR creation fails, state that explicitly.
 
@@ -403,12 +485,22 @@ def construct_system_prompt(
     linear_project_id: str = "",
     linear_issue_number: str = "",
     triggering_user_identity: CollaboratorIdentity | None = None,
+    thread_id: str = "",
 ) -> str:
     default_prompt_section = _load_default_prompt()
-    return SYSTEM_PROMPT_TEMPLATE.format(
+    prompt = SYSTEM_PROMPT_TEMPLATE.format(
         working_dir=working_dir,
         linear_project_id=linear_project_id or "<PROJECT_ID>",
         linear_issue_number=linear_issue_number or "<ISSUE_NUMBER>",
         default_prompt_section=default_prompt_section,
         collaboration_section=_render_collaboration_section(triggering_user_identity),
     )
+    # Non-LangSmith sandboxes: no GitHub proxy, GH_TOKEN is set in env by sandbox factory.
+    # Replace "GH_TOKEN=dummy gh" so gh CLI uses the real token from env.
+    if os.environ.get("SANDBOX_TYPE") in ("local", "fargate"):
+        prompt = prompt.replace("GH_TOKEN=dummy ", "")
+    # Inject thread ID for unique branch naming
+    if thread_id:
+        short_id = thread_id[:8]
+        prompt += f"\n\nYour conversation thread ID is: {short_id}. Use this in your branch name."
+    return prompt

@@ -158,3 +158,40 @@ test/
 | `{source}` | `{test}` |
 
 {Note any gaps in test coverage.}
+
+---
+
+## Agent Rules
+
+### 1. Read Before You Write
+- Search for existing implementations before writing new code
+- When replacing function calls (e.g. console.log → logger): read the target function's SOURCE CODE first — never assume its API from training data
+- When using internal utilities: read their source to understand actual signatures and behavior
+- When touching database queries: read the model/schema definitions first
+
+### 2. Implement Carefully
+- Make minimal, focused changes — do not modify unrelated code
+- Do not duplicate existing utilities — reuse what exists
+- Do not hardcode credentials, API keys, or env-specific values
+- Do not add placeholder/mock data that could reach production
+- For bulk refactoring: change incrementally and verify after each batch
+
+### 3. Validate Before PR (MANDATORY)
+Every PR must pass these checks before submission:
+
+| Check | Command | When |
+|-------|---------|------|
+| **Syntax** | `node -c <file>` or `python -m py_compile <file>` | Always |
+| **Import** | `node -e "require('./<file>')"` | Always |
+| **Existing tests** | Run tests related to changed files | If tests exist |
+| **New tests** | Write minimal test for core behavior | If no tests exist |
+| **Business logic** | Verify with concrete example | If logic/rules changed |
+
+A PR with syntax errors, broken imports, or failing tests is unacceptable.
+
+### 4. Common Mistakes to Avoid
+- Assuming function signatures from training data instead of reading source
+- Silently dropping function parameters (e.g. converting `f(a, b, c)` to `g(a)` without checking if `g` supports the extra args)
+- Reimplementing existing utilities instead of importing them
+- Changing error handling in a way that hides errors from users
+- Adding dependencies without checking if equivalent functionality already exists in the codebase

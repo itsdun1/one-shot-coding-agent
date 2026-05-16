@@ -331,11 +331,12 @@ async def deterministic_checks(config: Any, state: dict[str, Any]) -> dict[str, 
     """
     # Late imports so the module can be unit-tested without the full
     # framework installed.
-    from agent.utils.sandbox_helpers import (  # type: ignore[import-untyped]
-        get_sandbox_backend,
-        resolve_repo_path,
-        store_check_results,
-    )
+    from agent.utils.sandbox_state import get_sandbox_backend_sync as get_sandbox_backend
+    from agent.utils.sandbox_paths import resolve_sandbox_work_dir as resolve_repo_path
+
+    async def store_check_results(cfg: dict, results: dict) -> None:
+        """Store check results in thread metadata for PR body."""
+        pass  # TODO: implement via langgraph_sdk thread metadata
 
     thread_id: str = config.get("configurable", {}).get("thread_id", "")
     sandbox = get_sandbox_backend(thread_id)
