@@ -203,6 +203,34 @@ Open SWE ships with a small set of custom tools on top of the built-in Deep Agen
 | `linear_comment` | `agent/tools/linear_comment.py` | Post comments on Linear tickets |
 | `slack_thread_reply` | `agent/tools/slack_thread_reply.py` | Reply in Slack threads |
 
+### Web search provider
+
+The existing `web_search` tool uses Exa by default and requires `EXA_API_KEY`.
+To research current library documentation and code examples without a search API
+key, install the optional [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp)
+backend and select it in your server environment:
+
+```bash
+uv sync --extra parallel
+export WEB_SEARCH_PROVIDER="parallel"
+```
+
+Restart the server after changing its environment. No Parallel account or API key
+is needed. Anonymous search uses Fast mode and is intended for exploration and
+light use, with service-managed rate limits. Search queries are sent to
+`https://search.parallel.ai/mcp`.
+
+The tool keeps its `success`, `results`, and `error` response fields. Parallel's
+`results` string contains a JSON list of URLs, titles, and relevant excerpts,
+rather than full page contents. `num_results` caps the returned list locally;
+the service may return fewer results. Set `include_contents=False` to omit
+excerpts. The existing `fetch_url` tool is available for reading a complete page.
+Search failures, including rate limits and the 60-second overall timeout, return
+`success=False` with an error; they do not switch providers.
+
+To use Exa again, set `WEB_SEARCH_PROVIDER="exa"` (or unset it) and configure
+`EXA_API_KEY`. Installing the Parallel extra alone does not change the provider.
+
 ### Adding a tool
 
 Create a new file in `agent/tools/`, define a function, and add it to the tools list.
